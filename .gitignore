@@ -1,0 +1,67 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Node
+node_modules/
+.pnp
+.pnp.js
+dist/
+dist-ssr/
+*.local
+.eslintcache
+.vite/
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Docker
+*.pid
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Reports/generated
+reports_output/
+uploads/
+
+# Playwright product-tour demo
+demo/
+demo/node_modules/
+demo/test-results/
+demo/playwright-report/
+demo/.playwright/
+
+# Product-tour recording (saved to repo root)
+itad-product-tour.webm
+*.webm

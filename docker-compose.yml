@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: itad_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-itad}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-itad_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-itad}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-itad} -d ${POSTGRES_DB:-itad}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: itad_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-itad}:${POSTGRES_PASSWORD:-itad_dev_password}@postgres:5432/${POSTGRES_DB:-itad}
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production-please-use-openssl-rand-hex-32}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-720}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost}
+      PROJECT_NAME: ${PROJECT_NAME:-ITAD Platform}
+      API_V1_PREFIX: ${API_V1_PREFIX:-/api/v1}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-true}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-Demo123!}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
+        VITE_WS_BASE_URL: ${VITE_WS_BASE_URL:-/api/v1/ws}
+    container_name: itad_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
+volumes:
+  postgres_data:

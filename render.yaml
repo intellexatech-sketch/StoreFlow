@@ -1,0 +1,109 @@
+# Render Blueprint - ITAD Platform
+# ---------------------------------
+# Provisions three resources when deployed via Render's Blueprint flow
+# (New -> Blueprint -> select this repo):
+#
+#   1. Managed PostgreSQL 16                (itad-postgres)
+#   2. Backend FastAPI service, Docker      (itad-backend)
+#   3. Frontend static site (Vite build)    (itad-frontend)
+#
+# Three env vars are marked `sync: false` because their values are the
+# public URLs of *other* services in this blueprint, which Render does
+# not know until the first deploy assigns them. See RENDER.md for the
+# two-step deploy flow.
+
+databases:
+  - name: itad-postgres
+    plan: free
+    databaseName: itad
+    user: itad
+    region: oregon
+    postgresMajorVersion: "16"
+
+services:
+  # ---------------------------------------------------------------
+  # Backend - FastAPI + Uvicorn (Docker)
+  # ---------------------------------------------------------------
+  - type: web
+    name: itad-backend
+    runtime: docker
+    plan: free
+    region: oregon
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /docs
+    autoDeploy: true
+    envVars:
+      # DB connection - Render injects the full postgresql:// URL
+      # from the managed database above. SQLAlchemy auto-selects
+      # psycopg2 (already in requirements.txt).
+      - key: DATABASE_URL
+        fromDatabase:
+          name: itad-postgres
+          property: connectionString
+
+      # Auth - Render generates a strong random value on first deploy
+      # and reuses it thereafter.
+      - key: SECRET_KEY
+        generateValue: true
+
+      # Demo mode - keeps the seeded demo users endpoint enabled so
+      # the login screen shows them and the tour can log in as admin.
+      - key: ENVIRONMENT
+        value: demo
+      - key: SEED_ON_STARTUP
+        value: "true"
+      - key: DEMO_PASSWORD
+        value: Demo123!
+
+      # Non-secret settings mirrored from docker-compose defaults
+      - key: PROJECT_NAME
+        value: ITAD Platform
+      - key: API_V1_PREFIX
+        value: /api/v1
+      - key: ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "720"
+
+      # CORS origin for the frontend. sync:false = fill this in after
+      # the first deploy once you know the frontend's Render URL,
+      # e.g. https://itad-frontend-abcd.onrender.com
+      - key: BACKEND_CORS_ORIGINS
+        sync: false
+
+  # ---------------------------------------------------------------
+  # Frontend - Vite build served as a Render Static Site
+  # ---------------------------------------------------------------
+  - type: web
+    name: itad-frontend
+    runtime: static
+    plan: free
+    region: oregon
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    autoDeploy: true
+    envVars:
+      # Absolute backend URL - browser calls this directly. sync:false =
+      # fill in after first deploy, e.g.
+      #   https://itad-backend-abcd.onrender.com/api/v1
+      - key: VITE_API_BASE_URL
+        sync: false
+      # WebSocket base URL, e.g.
+      #   wss://itad-backend-abcd.onrender.com/api/v1/ws
+      # If left blank the app falls back to REST polling every 20 s.
+      - key: VITE_WS_BASE_URL
+        sync: false
+    routes:
+      # SPA fallback - unknown paths return index.html so React Router
+      # handles the route client-side.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      # Long-cache hashed Vite assets (immutable filenames)
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
